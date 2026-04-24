@@ -1,0 +1,133 @@
+=============================================================================
+                          EDUGUIDE - PROJECT LOGIC & DESCRIPTION
+=============================================================================
+
+1. PROJECT OVERVIEW
+-----------------------------------------------------------------------------
+EduGuide is an intelligent, AI-powered career decision support system and 
+college recommendation platform. Its primary goal is to help students identify 
+their natural aptitudes and seamlessly map them to relevant career streams, 
+specific degree programs, and the best-fitting colleges in Tamil Nadu.
+
+The system replaces guesswork with a data-driven pipeline:
+Aptitude Test -> Stream Recommendation -> Degree Auto-Selection -> College Ranking -> AI Career Advice.
+
+
+2. TECHNOLOGY STACK
+-----------------------------------------------------------------------------
+* Frontend: React 18, TypeScript, TailwindCSS v4, Framer Motion (Animations).
+* Backend: Node.js/Express (converted to Netlify Serverless Functions).
+* Database: Supabase (PostgreSQL) - Stores 1000+ colleges, degrees, and questions.
+* AI Engine: Groq SDK utilizing the Llama-3.1-8b-instant model.
+* Hosting/Deployment: Netlify.
+
+
+3. USER FLOW
+-----------------------------------------------------------------------------
+Step 1: Student Details Entry (Name, Class, District).
+Step 2: Interactive 20-question Aptitude Quiz.
+Step 3: Results View (Domain scores, Confidence metric, Recommended Streams).
+Step 4: College Finder (Filtering, Ranking, and Matching).
+Step 5: AI Advisor (Personalized roadmap and interactive chat).
+
+
+4. CORE ENGINES & LOGIC
+-----------------------------------------------------------------------------
+
+A. Aptitude Assessment Engine
+- Logic: The quiz consists of 20 questions mapped to 5 core domains:
+  1. Logical  2. Analytical  3. Creative  4. Communication  5. Practical.
+- Scoring: When a user answers a question (1-5 scale), the score is multiplied 
+  by the question's 'weight' and a 'difficulty multiplier' (easy=1.0, 
+  medium=1.25, hard=1.5).
+- Normalization: The raw scores are normalized into a 0-100% scale for each domain.
+- Confidence Metric: The system calculates the mathematical variance across 
+  the answers. If a user randomly guesses (high variance), the system flags 
+  the result confidence as "Low" (Variance Threshold > 5.0). Otherwise, "High".
+
+B. Stream Recommendation Engine
+- Logic: Uses a `streamMatrix` that defines the ideal domain profile for three 
+  major categories:
+  * Engineering & Technology (High Logical/Analytical)
+  * Medical & Allied Health (High Analytical/Practical)
+  * Arts, Science & Commerce (High Communication/Creative)
+- The user's normalized domain scores are multiplied against this matrix to 
+  calculate a "Fit Percentage" for each stream.
+
+C. Intelligent Degree Auto-Selection
+- Logic: Before the user even searches for a college, the system scans all 
+  22+ available degrees in the database.
+- It calculates a "Synergy Score" by comparing the student's domain scores 
+  against the required domains for every single degree. The degree with the 
+  highest synergy is automatically pre-selected to reduce friction.
+
+D. College Ranking Engine
+- Logic: Fetches live data from Supabase (1000 colleges).
+- Filtering: Hard filters remove colleges that don't match the selected 
+  Degree, Maximum Budget, Preferred District, and College Type.
+- Ranking Algorithm (Weights):
+  1. Placement Factor (40%): Based on historical placement ratings (1-5).
+  2. Affordability Factor (20%): Proportional score based on how far below 
+     the max budget the fees are.
+  3. Proximity Factor (20%): 1.0 for home district, 0.5 for neighboring 
+     districts (using a predefined proximity map).
+  4. Synergy Score (20%): How well the student's aptitude matches the specific 
+     degree requirements at that college.
+- Boosts: The algorithm includes custom heuristics (e.g., a slight +0.1 
+  priority boost for KSR institutions in Namakkal).
+- Match Reason: A deterministic tag is assigned to explain WHY a college is 
+  ranked high (e.g., "Top-tier placement", "Best value choice").
+
+E. AI Advisor Engine (Groq / Llama 3)
+- Logic: Passes the student's domain scores, top stream, and recommended 
+  degrees to the Groq API via a highly constrained system prompt.
+- API Key Rollover: To bypass rate limits, the backend implements a Round-Robin 
+  mechanism. It maintains an array of 4 different Groq API keys and cycles 
+  through them sequentially for every request (Modulo arithmetic).
+- The AI generates a 4-part explanation: Why the stream fits, Key strengths, 
+  Career opportunities, and a Step-by-step roadmap.
+
+
+5. DATABASE SCHEMA (SUPABASE)
+-----------------------------------------------------------------------------
+1. `colleges`: id, name, type, district, category, fees, placement, degrees[].
+2. `degrees`: id, name, required_domains (JSON), careers[].
+3. `questions`: id, text, domain, weight, difficulty.
+
+All backend functions (`assessAptitude`, `rankColleges`) are asynchronous 
+and fetch directly from these tables to ensure data is always live.
+
+
+6. HOW TO DEPLOY FEATURE UPDATES
+-----------------------------------------------------------------------------
+Since EduGuide is now driven by a live database (Supabase) and hosted on a 
+modern CI/CD platform (Netlify via GitHub), updating the platform is 
+incredibly streamlined.
+
+A. Updating Data (Colleges, Degrees, Questions)
+If you just want to add a new college, change the required domains for a 
+degree, or tweak the wording of a quiz question:
+1. Go to your Supabase Dashboard (https://supabase.com).
+2. Open the Table Editor and edit the `colleges`, `degrees`, or `questions` table.
+3. Save the changes.
+-> Result: The live website will instantly reflect these changes the next 
+   time a user takes the quiz or searches for a college. No code deployment 
+   is required!
+
+B. Updating Code / Adding New Features (UI or Logic)
+If you want to add a new button, change the color scheme, or update the AI 
+Advisor logic:
+1. Make your changes locally on your machine in the `/home/gokulraj/eduguide` 
+   directory.
+2. Test the changes locally by running: `npm run dev` (View at localhost:3000).
+3. Once satisfied, push your code changes to your GitHub repository:
+   * Option 1 (If using Git CLI): 
+     `git add .`
+     `git commit -m "Added new feature"`
+     `git push origin main`
+   * Option 2 (If using the Python REST API script):
+     Run `python3 scratch/push_to_github.py`
+4. Netlify will detect the new push to the GitHub `main` branch and will 
+   automatically trigger a new build.
+-> Result: Within 1-2 minutes, Netlify will seamlessly deploy your new code 
+   changes to the live URL.
